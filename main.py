@@ -157,10 +157,20 @@ def run_compare(query):
     print("\n=====================================")
 
 if __name__ == "__main__":
-    print("Tip: type 'compare: your question' to run Gemini vs Groq side by side.")
     while True:
         try:
-            query = input("\nWhat can I help you research? (type exit to quit) ")
+            mode = input("\nSingle model or compare two models? (1 = single, 2 = compare, exit to quit) ")
+        except KeyboardInterrupt:
+            print("\nGoodbye!")
+            break
+        if mode.strip().lower() in ("exit", "quit", "q", "no", "n"):
+            print("Goodbye!")
+            break
+        if mode.strip() not in ("1", "2", "single", "compare", "both"):
+            print("Please type 1 for single or 2 for compare.")
+            continue
+        try:
+            query = input("What can I help you research? (type exit to quit) ")
         except KeyboardInterrupt:
             print("\nGoodbye!")
             break
@@ -169,8 +179,8 @@ if __name__ == "__main__":
             break
         if not query.strip():
             continue
-        if query.strip().lower().startswith("compare:"):
-            run_compare(query.split(":", 1)[1].strip())
+        if mode.strip() in ("2", "compare", "both"):
+            run_compare(query.strip())
             print("\nDone with your output. Do you want any other research? (type exit to quit)")
             continue
         try:
