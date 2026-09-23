@@ -1,4 +1,5 @@
 import os
+import time
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from langchain_core.prompts import ChatPromptTemplate
@@ -14,6 +15,30 @@ class ResearchResponse(BaseModel):
     summary: str
     sources: list[str]
     tools_used: list[str]
+
+
+def build_llm(provider):
+    if provider == "google":
+        google_key = os.getenv("GOOGLE_API_KEY")
+        if not google_key:
+            return None
+        from langchain_google_genai import ChatGoogleGenerativeAI
+
+        return ChatGoogleGenerativeAI(
+            model=os.getenv("GEMINI_MODEL", "gemini-3-flash-preview"),
+            google_api_key=google_key,
+        )
+    if provider == "groq":
+        groq_key = os.getenv("GROQ_API_KEY")
+        if not groq_key:
+            return None
+        from langchain_groq import ChatGroq
+
+        return ChatGroq(
+            model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+            groq_api_key=groq_key,
+        )
+    return None
 
 
 def get_llm():
@@ -33,9 +58,9 @@ def get_llm():
     if groq_key:
         from langchain_groq import ChatGroq
 
-        print("Using Groq (free tier): llama-3.3-70b-versatile")
+        print("Using Groq (free tier): openai/gpt-oss-20b")
         return ChatGroq(
-            model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+            model=os.getenv("GROQ_MODEL", "openai/gpt-oss-20b"),
             groq_api_key=groq_key,
         )
     if openai_key:
@@ -87,7 +112,52 @@ agent = create_tool_calling_agent(llm=llm, prompt=prompt, tools=tools)
 
 agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
 
+compare_executors = {}
+for provider in ("google", "groq"):
+    provider_llm = build_llm(provider)
+    if provider_llm is not None:
+        provider_agent = create_tool_calling_agent(llm=provider_llm, prompt=prompt, tools=tools)
+        compare_executors[provider] = AgentExecutor(agent=provider_agent, tools=tools, verbose=False)
+
+
+def run_once(executor, query):
+    start = time.time()
+    try:
+        raw_response = executor.invoke({"query": query})
+    except Exception as e:
+        return None, f"Agent error: {e}", time.time() - start
+    output = raw_response.get("output", "")
+    if isinstance(output, list):
+        output_text = output[0].get("text", "") if isinstance(output[0], dict) else str(output[0])
+    else:
+        output_text = output
+    try:
+        structured_response = parser.parse(output_text)
+        return structured_response, None, time.time() - start
+    except Exception as e:
+        return None, f"Parse error: {e} | Raw: {output_text}", time.time() - start
+
+
+def run_compare(query):
+    if len(compare_executors) < 2:
+        print("Compare needs both GOOGLE_API_KEY and GROQ_API_KEY in .env.")
+        return
+    results = {}
+    for provider, executor in compare_executors.items():
+        print(f"\n--- Running {provider} ---")
+        structured, error, elapsed = run_once(executor, query)
+        results[provider] = (structured, error, elapsed)
+    print("\n========== Compare Results ==========")
+    for provider, (structured, error, elapsed) in results.items():
+        print(f"\n--- {provider} ({elapsed:.1f}s) ---")
+        if structured is not None:
+            print(structured)
+        else:
+            print(error)
+    print("\n=====================================")
+
 if __name__ == "__main__":
+    print("Tip: type 'compare: your question' to run Gemini vs Groq side by side.")
     while True:
         try:
             query = input("\nWhat can I help you research? (type exit to quit) ")
@@ -98,6 +168,10 @@ if __name__ == "__main__":
             print("Goodbye!")
             break
         if not query.strip():
+            continue
+        if query.strip().lower().startswith("compare:"):
+            run_compare(query.split(":", 1)[1].strip())
+            print("\nDone with your output. Do you want any other research? (type exit to quit)")
             continue
         try:
             raw_response = agent_executor.invoke({"query": query})
