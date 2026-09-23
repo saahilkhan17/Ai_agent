@@ -21,9 +21,23 @@ save_tool = Tool(
 )
 
 search = DuckDuckGoSearchRun()
+
+
+def safe_search(query: str) -> str:
+    for attempt in range(3):
+        try:
+            return search.run(query)
+        except Exception as e:
+            if attempt == 2:
+                return f"Web search unavailable right now ({e}). Use your own knowledge instead."
+            import time as _time
+
+            _time.sleep(2)
+
+
 search_tool = Tool(
     name="search",
-    func=search.run,
+    func=safe_search,
     description="Search the web for information. Useful for current events, facts, and general research.",
 )
 

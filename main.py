@@ -58,9 +58,9 @@ def get_llm():
     if groq_key:
         from langchain_groq import ChatGroq
 
-        print("Using Groq (free tier): openai/gpt-oss-20b")
+        print("Using Groq (free tier): qwen/qwen3.8-27b")
         return ChatGroq(
-            model=os.getenv("GROQ_MODEL", "openai/gpt-oss-20b"),
+            model=os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b"),
             groq_api_key=groq_key,
         )
     if openai_key:
@@ -188,6 +188,24 @@ if __name__ == "__main__":
         except KeyboardInterrupt:
             print("\nGoodbye!")
             break
+        except Exception as e:
+            msg = str(e)
+            if "429" in msg or "RESOURCE_EXHAUSTED" in msg or "quota" in msg.lower():
+                print("\nGoogle free quota exhausted for today. Trying Groq instead...")
+                groq_executor = compare_executors.get("groq")
+                if groq_executor is not None:
+                    structured, error, elapsed = run_once(groq_executor, query)
+                    if structured is not None:
+                        print(f"\n=== Structured Response (groq, {elapsed:.1f}s) ===")
+                        print(structured)
+                    else:
+                        print("Groq also failed:", error)
+                else:
+                    print("No GROQ_API_KEY in .env, cannot fall back. Try again tomorrow.")
+            else:
+                print("Agent error:", e)
+            print("\nDone with your output. Do you want any other research? (type exit to quit)")
+            continue
         output = raw_response.get("output", "")
         if isinstance(output, list):
             output_text = output[0].get("text", "") if isinstance(output[0], dict) else str(output[0])
