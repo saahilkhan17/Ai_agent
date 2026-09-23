@@ -1,5 +1,4 @@
 import os
-import time
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from langchain_core.prompts import ChatPromptTemplate
@@ -15,30 +14,6 @@ class ResearchResponse(BaseModel):
     summary: str
     sources: list[str]
     tools_used: list[str]
-
-
-def build_llm(provider):
-    if provider == "google":
-        google_key = os.getenv("GOOGLE_API_KEY")
-        if not google_key:
-            return None
-        from langchain_google_genai import ChatGoogleGenerativeAI
-
-        return ChatGoogleGenerativeAI(
-            model=os.getenv("GEMINI_MODEL", "gemini-3-flash-preview"),
-            google_api_key=google_key,
-        )
-    if provider == "groq":
-        groq_key = os.getenv("GROQ_API_KEY")
-        if not groq_key:
-            return None
-        from langchain_groq import ChatGroq
-
-        return ChatGroq(
-            model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
-            groq_api_key=groq_key,
-        )
-    return None
 
 
 def get_llm():
@@ -89,16 +64,6 @@ def get_llm():
 
 
 llm = get_llm()
-if os.getenv("GOOGLE_API_KEY"):
-    default_label = "GEMINI"
-elif os.getenv("GROQ_API_KEY"):
-    default_label = "GROQ"
-elif os.getenv("OPENAI_API_KEY"):
-    default_label = "OPENAI"
-elif os.getenv("ANTHROPIC_API_KEY"):
-    default_label = "ANTHROPIC"
-else:
-    default_label = "OLLAMA"
 parser = PydanticOutputParser(pydantic_object=ResearchResponse)
 
 prompt = ChatPromptTemplate.from_messages(
@@ -122,82 +87,10 @@ agent = create_tool_calling_agent(llm=llm, prompt=prompt, tools=tools)
 
 agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True, max_iterations=8)
 
-compare_tools = [search_tool, wiki_tool]
-compare_executors = {}
-for provider in ("google", "groq"):
-    provider_llm = build_llm(provider)
-    if provider_llm is not None:
-        provider_agent = create_tool_calling_agent(llm=provider_llm, prompt=prompt, tools=compare_tools)
-        compare_executors[provider] = AgentExecutor(agent=provider_agent, tools=compare_tools, verbose=False, max_iterations=8)
-
-
-def run_once(executor, query):
-    start = time.time()
-    try:
-        raw_response = executor.invoke({"query": query})
-    except Exception as e:
-        return None, f"Agent error: {e}", time.time() - start
-    output = raw_response.get("output", "")
-    if isinstance(output, list):
-        output_text = output[0].get("text", "") if isinstance(output[0], dict) else str(output[0])
-    else:
-        output_text = output
-    try:
-        structured_response = parser.parse(output_text)
-        return structured_response, None, time.time() - start
-    except Exception as e:
-        return None, f"Parse error: {e} | Raw: {output_text}", time.time() - start
-
-
-def run_compare(query):
-    if len(compare_executors) < 2:
-        print("Compare needs both GOOGLE_API_KEY and GROQ_API_KEY in .env.")
-        return
-    results = {}
-    for provider, executor in compare_executors.items():
-        print(f"\n--- Running {provider} ---")
-        structured, error, elapsed = run_once(executor, query)
-        results[provider] = (structured, error, elapsed)
-    print("\n========== Compare Results ==========")
-    lines = [f"Query: {query}", ""]
-    for provider, (structured, error, elapsed) in results.items():
-        label = "GEMINI" if provider == "google" else "GROQ"
-        print(f"\n***** Answer from {label} ({elapsed:.1f}s) *****")
-        lines.append(f"***** Answer from {label} ({elapsed:.1f}s) *****")
-        if structured is not None:
-            print(f"Topic: {structured.topic}")
-            print(f"Summary: {structured.summary}")
-            print(f"Sources: {', '.join(structured.sources)}")
-            print(f"Tools used: {', '.join(structured.tools_used)}")
-            lines.append(f"Topic: {structured.topic}")
-            lines.append(f"Summary: {structured.summary}")
-            lines.append(f"Sources: {', '.join(structured.sources)}")
-            lines.append(f"Tools used: {', '.join(structured.tools_used)}")
-        else:
-            print(error)
-            lines.append(error)
-        lines.append("")
-    print("\n=====================================")
-    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-    with open("compare_output.txt", "a", encoding="utf-8") as f:
-        f.write(f"--- Compare Output ---\nTimestamp: {timestamp}\n" + "\n".join(lines) + "\n\n")
-    print("Labeled answers saved to compare_output.txt")
-
 if __name__ == "__main__":
     while True:
         try:
-            mode = input("\nSingle model or compare two models? (1 = single, 2 = compare, exit to quit) ")
-        except KeyboardInterrupt:
-            print("\nGoodbye!")
-            break
-        if mode.strip().lower() in ("exit", "quit", "q", "no", "n"):
-            print("Goodbye!")
-            break
-        if mode.strip() not in ("1", "2", "single", "compare", "both"):
-            print("Please type 1 for single or 2 for compare.")
-            continue
-        try:
-            query = input("What can I help you research? (type exit to quit) ")
+            query = input("\nWhat can I help you research? (type exit to quit) ")
         except KeyboardInterrupt:
             print("\nGoodbye!")
             break
@@ -205,10 +98,6 @@ if __name__ == "__main__":
             print("Goodbye!")
             break
         if not query.strip():
-            continue
-        if mode.strip() in ("2", "compare", "both"):
-            run_compare(query.strip())
-            print("\nDone with your output. Do you want any other research? (type exit to quit)")
             continue
         try:
             raw_response = agent_executor.invoke({"query": query})
@@ -218,17 +107,7 @@ if __name__ == "__main__":
         except Exception as e:
             msg = str(e)
             if "429" in msg or "RESOURCE_EXHAUSTED" in msg or "quota" in msg.lower():
-                print("\nGoogle free quota exhausted for today. Trying Groq instead...")
-                groq_executor = compare_executors.get("groq")
-                if groq_executor is not None:
-                    structured, error, elapsed = run_once(groq_executor, query)
-                    if structured is not None:
-                        print(f"\n***** Answer from GROQ ({elapsed:.1f}s) *****")
-                        print(structured)
-                    else:
-                        print("Groq also failed:", error)
-                else:
-                    print("No GROQ_API_KEY in .env, cannot fall back. Try again tomorrow.")
+                print("\nGoogle free quota exhausted for today. Try again tomorrow.")
             else:
                 print("Agent error:", e)
             print("\nDone with your output. Do you want any other research? (type exit to quit)")
@@ -240,11 +119,8 @@ if __name__ == "__main__":
             output_text = output
         try:
             structured_response = parser.parse(output_text)
-            print(f"\n***** Answer from {default_label} *****")
+            print("\n=== Structured Response ===")
             print(structured_response)
-            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-            with open("research_output.txt", "a", encoding="utf-8") as f:
-                f.write(f"--- Research Output ---\nTimestamp: {timestamp}\nAnswer from {default_label}\nQuery: {query}\n{structured_response}\n\n")
         except Exception as e:
             print("Error parsing response:", e)
             print("Raw Response:", output_text)
