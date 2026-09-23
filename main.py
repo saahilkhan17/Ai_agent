@@ -89,6 +89,16 @@ def get_llm():
 
 
 llm = get_llm()
+if os.getenv("GOOGLE_API_KEY"):
+    default_label = "GEMINI"
+elif os.getenv("GROQ_API_KEY"):
+    default_label = "GROQ"
+elif os.getenv("OPENAI_API_KEY"):
+    default_label = "OPENAI"
+elif os.getenv("ANTHROPIC_API_KEY"):
+    default_label = "ANTHROPIC"
+else:
+    default_label = "OLLAMA"
 parser = PydanticOutputParser(pydantic_object=ResearchResponse)
 
 prompt = ChatPromptTemplate.from_messages(
@@ -149,17 +159,29 @@ def run_compare(query):
         structured, error, elapsed = run_once(executor, query)
         results[provider] = (structured, error, elapsed)
     print("\n========== Compare Results ==========")
+    lines = [f"Query: {query}", ""]
     for provider, (structured, error, elapsed) in results.items():
         label = "GEMINI" if provider == "google" else "GROQ"
         print(f"\n***** Answer from {label} ({elapsed:.1f}s) *****")
+        lines.append(f"***** Answer from {label} ({elapsed:.1f}s) *****")
         if structured is not None:
             print(f"Topic: {structured.topic}")
             print(f"Summary: {structured.summary}")
             print(f"Sources: {', '.join(structured.sources)}")
             print(f"Tools used: {', '.join(structured.tools_used)}")
+            lines.append(f"Topic: {structured.topic}")
+            lines.append(f"Summary: {structured.summary}")
+            lines.append(f"Sources: {', '.join(structured.sources)}")
+            lines.append(f"Tools used: {', '.join(structured.tools_used)}")
         else:
             print(error)
+            lines.append(error)
+        lines.append("")
     print("\n=====================================")
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    with open("compare_output.txt", "a", encoding="utf-8") as f:
+        f.write(f"--- Compare Output ---\nTimestamp: {timestamp}\n" + "\n".join(lines) + "\n\n")
+    print("Labeled answers saved to compare_output.txt")
 
 if __name__ == "__main__":
     while True:
@@ -201,7 +223,7 @@ if __name__ == "__main__":
                 if groq_executor is not None:
                     structured, error, elapsed = run_once(groq_executor, query)
                     if structured is not None:
-                        print(f"\n=== Structured Response (groq, {elapsed:.1f}s) ===")
+                        print(f"\n***** Answer from GROQ ({elapsed:.1f}s) *****")
                         print(structured)
                     else:
                         print("Groq also failed:", error)
@@ -218,8 +240,11 @@ if __name__ == "__main__":
             output_text = output
         try:
             structured_response = parser.parse(output_text)
-            print("\n=== Structured Response ===")
+            print(f"\n***** Answer from {default_label} *****")
             print(structured_response)
+            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+            with open("research_output.txt", "a", encoding="utf-8") as f:
+                f.write(f"--- Research Output ---\nTimestamp: {timestamp}\nAnswer from {default_label}\nQuery: {query}\n{structured_response}\n\n")
         except Exception as e:
             print("Error parsing response:", e)
             print("Raw Response:", output_text)
