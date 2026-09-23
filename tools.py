@@ -28,4 +28,18 @@ search_tool = Tool(
 )
 
 api_wrapper = WikipediaAPIWrapper(top_k_results=1, doc_content_chars_max=2000)
-wiki_tool = WikipediaQueryRun(api_wrapper=api_wrapper)
+_wiki = WikipediaQueryRun(api_wrapper=api_wrapper)
+
+
+def safe_wiki(query: str) -> str:
+    try:
+        return _wiki.run(query)
+    except Exception as e:
+        return f"Wikipedia unavailable right now ({e}). Use web search results instead."
+
+
+wiki_tool = Tool(
+    name="wikipedia",
+    func=safe_wiki,
+    description="Look up facts on Wikipedia. If unavailable, use web search instead.",
+)
