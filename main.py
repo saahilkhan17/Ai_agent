@@ -110,14 +110,15 @@ prompt = ChatPromptTemplate.from_messages(
 tools = [search_tool, wiki_tool, save_tool]
 agent = create_tool_calling_agent(llm=llm, prompt=prompt, tools=tools)
 
-agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True, max_iterations=8)
 
+compare_tools = [search_tool, wiki_tool]
 compare_executors = {}
 for provider in ("google", "groq"):
     provider_llm = build_llm(provider)
     if provider_llm is not None:
-        provider_agent = create_tool_calling_agent(llm=provider_llm, prompt=prompt, tools=tools)
-        compare_executors[provider] = AgentExecutor(agent=provider_agent, tools=tools, verbose=False)
+        provider_agent = create_tool_calling_agent(llm=provider_llm, prompt=prompt, tools=compare_tools)
+        compare_executors[provider] = AgentExecutor(agent=provider_agent, tools=compare_tools, verbose=False, max_iterations=8)
 
 
 def run_once(executor, query):
@@ -149,9 +150,13 @@ def run_compare(query):
         results[provider] = (structured, error, elapsed)
     print("\n========== Compare Results ==========")
     for provider, (structured, error, elapsed) in results.items():
-        print(f"\n--- {provider} ({elapsed:.1f}s) ---")
+        label = "GEMINI" if provider == "google" else "GROQ"
+        print(f"\n***** Answer from {label} ({elapsed:.1f}s) *****")
         if structured is not None:
-            print(structured)
+            print(f"Topic: {structured.topic}")
+            print(f"Summary: {structured.summary}")
+            print(f"Sources: {', '.join(structured.sources)}")
+            print(f"Tools used: {', '.join(structured.tools_used)}")
         else:
             print(error)
     print("\n=====================================")
