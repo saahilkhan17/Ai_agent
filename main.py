@@ -88,19 +88,32 @@ agent = create_tool_calling_agent(llm=llm, prompt=prompt, tools=tools)
 agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
 
 if __name__ == "__main__":
-    query = input("What can I help you research? ")
-    raw_response = agent_executor.invoke({"query": query})
-
-    output = raw_response.get("output", "")
-    if isinstance(output, list):
-        output_text = output[0].get("text", "") if isinstance(output[0], dict) else str(output[0])
-    else:
-        output_text = output
-
-    try:
-        structured_response = parser.parse(output_text)
-        print("\n=== Structured Response ===")
-        print(structured_response)
-    except Exception as e:
-        print("Error parsing response:", e)
-        print("Raw Response:", output_text)
+    while True:
+        try:
+            query = input("\nWhat can I help you research? (type exit to quit) ")
+        except KeyboardInterrupt:
+            print("\nGoodbye!")
+            break
+        if query.strip().lower() in ("exit", "quit", "q", "no", "n"):
+            print("Goodbye!")
+            break
+        if not query.strip():
+            continue
+        try:
+            raw_response = agent_executor.invoke({"query": query})
+        except KeyboardInterrupt:
+            print("\nGoodbye!")
+            break
+        output = raw_response.get("output", "")
+        if isinstance(output, list):
+            output_text = output[0].get("text", "") if isinstance(output[0], dict) else str(output[0])
+        else:
+            output_text = output
+        try:
+            structured_response = parser.parse(output_text)
+            print("\n=== Structured Response ===")
+            print(structured_response)
+        except Exception as e:
+            print("Error parsing response:", e)
+            print("Raw Response:", output_text)
+        print("\nDone with your output. Do you want any other research? (type exit to quit)")
