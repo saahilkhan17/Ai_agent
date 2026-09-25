@@ -1,6 +1,8 @@
-# AI Research Agent
+# AI Research Agent with LangChain, Gemini & Groq — by Saahil Khan Mehar (@saahilkhan17)
 
-A Python AI agent that researches any topic using web search and Wikipedia, returns structured results, and can save them to a file. Built with LangChain.
+> **AI Research Agent by Saahil Khan Mehar (Saahil Khan, @saahilkhan17).** A Python AI agent that researches any topic using web search + Wikipedia, returns structured results, and saves them to file. Built with LangChain with free Google Gemini, Groq, and Ollama support.
+>
+> **Author:** [Saahil Khan Mehar](https://github.com/saahilkhan17) — [github.com/saahilkhan17](https://github.com/saahilkhan17) | Portfolio: [saahilkhan17.github.io](https://saahilkhan17.github.io/) | Computer Science student, Cloud Computing & Python developer.
 
 Based on Tech With Tim's tutorial: https://youtu.be/bTMPwUgLZf0
 Original repo: https://github.com/techwithtim/PythonAIAgentFromScratch
@@ -46,7 +48,7 @@ Ai_agent/
 ## Installation
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/saahilkhan17/Ai_agent.git
 cd Ai_agent
 
 python -m venv venv
@@ -71,7 +73,7 @@ cp sample.env .env
 Open `.env` and set one of these:
 
 | Provider | Variable | Where to get key | Cost |
-|----------|----------|------------------|------|
+|---|---|---|---|
 | Gemini (recommended) | `GOOGLE_API_KEY` | https://aistudio.google.com/app/apikey | Free |
 | Groq | `GROQ_API_KEY` | https://console.groq.com/keys | Free |
 | Ollama | — (no key needed) | Install from https://ollama.com + `ollama pull llama3.2` | Free / Local |
@@ -100,7 +102,7 @@ What can I help you research? Tell me about LangChain and save to file
 
 Example structured output:
 
-```python
+```
 topic='LangChain'
 summary='LangChain is a framework for building LLM-powered applications...'
 sources=['https://python.langchain.com/', 'https://en.wikipedia.org/wiki/LangChain']
@@ -133,6 +135,16 @@ See `requirements.txt`. Key packages:
 
 - Tutorial: Tech With Tim — Build an AI Agent From Scratch in Python
 - Framework: LangChain
+
+## About the Author
+
+**Saahil Khan Mehar (@saahilkhan17)** — Computer Science student, Cloud Computing & Python developer from India.
+
+- GitHub: https://github.com/saahilkhan17
+- Portfolio: https://saahilkhan17.github.io/
+- LinkedIn: https://www.linkedin.com/in/saahil-khan-mehar
+
+Keywords: Saahil Khan, Saahil Khan Mehar, saahilkhan17, AI Research Agent Python, LangChain Gemini Groq agent
 
 ## License
 
